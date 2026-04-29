@@ -6,6 +6,7 @@ import Editor from '../components/Editor';
 import Chat from '../components/Chat';
 import { Note, Tab } from '../types';
 import { noteApi } from '../services/noteApi';
+import { aiApi } from '../services/aiApi';
 
 export default function Home() {
   const [viewMode, setViewMode] = useState<'editor' | 'graph'>('editor');
@@ -20,6 +21,8 @@ export default function Home() {
   // Rename state tabContents -> noteContentsById for clarity
   const [noteContentsById, setNoteContentsById] = useState<Record<string, string>>({});
   const [isLoadingContent, setIsLoadingContent] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
 
   // Keep track of loaded files (prevent reload if activeTabId switches back and forth)
   const loadedNotesRef = useRef<Set<string>>(new Set());
@@ -105,6 +108,98 @@ export default function Home() {
     setNoteContentsById(prev => ({ ...prev, [activeTabId]: newContent }));
   };
 
+  const handleTitleChange = (id: string, newTitle: string) => {
+    setOpenTabs(prevTabs => Object.assign([], prevTabs).map((tab: Tab) => 
+      tab.id === id ? { ...tab, title: newTitle } : tab
+    ));
+    // Optimistically update the left sidebar notes if it exists
+    setNotes(prev => prev.map(n => n.id === id ? { ...n, title: newTitle } : n));
+  };
+
+  const handleSaveNote = async () => {
+    const isDraft = activeTabId.startsWith('draft-');
+    const content = noteContentsById[activeTabId] || "";
+    const tabObj = openTabs.find(t => t.id === activeTabId);
+    
+    if (!tabObj || !tabObj.title.trim()) {
+       setError("Note title cannot be empty");
+       return;
+    }
+
+    setIsSaving(true);
+    setError(null);
+    try {
+      if (isDraft) {
+        // Create new note
+        const newNote = await noteApi.createNote({
+          title: tabObj.title,
+          content: content
+        });
+
+        // Add to sidebar
+        setNotes(prev => [...prev, newNote]);
+        
+        // Update tab ID from draft-X to actual UUID
+        setOpenTabs(prev => prev.map(t => t.id === activeTabId ? { id: newNote.id, title: newNote.title } : t));
+        setActiveTabId(newNote.id);
+        
+        // Move content map
+        setNoteContentsById((prev: Record<string, string>) => {
+          const newMap: Record<string, string> = { ...prev, [newNote.id]: content };
+          delete newMap[activeTabId];
+          return newMap;
+        });
+
+        // update cache
+        loadedNotesRef.current.delete(activeTabId);
+        loadedNotesRef.current.add(newNote.id);
+
+      } else {
+        // Update existing note
+        await noteApi.updateNote(activeTabId, { content });
+        // NOTE: The backend may not support title update yet. We will only send content.
+      }
+      
+      // Auto-trigger sync
+      setIsSyncing(true);
+      await aiApi.syncVectorDB();
+      
+    } catch (err: unknown) {
+      console.error(err);
+      setError(err instanceof Error ? err.message : 'Failed to save or sync note');
+    } finally {
+      setIsSaving(false);
+      setIsSyncing(false);
+    }
+  };
+
+  const handleDeleteNote = async () => {
+    if (activeTabId.startsWith('draft-')) {
+      // It's a draft, just close the tab
+      handleCloseTab({ stopPropagation: () => {} } as React.MouseEvent, activeTabId);
+      return;
+    }
+
+    if (!window.confirm("Are you sure you want to delete this note?")) return;
+
+    setIsSaving(true);
+    try {
+      await noteApi.deleteNote(activeTabId);
+      setNotes(prev => prev.filter(n => n.id !== activeTabId));
+      handleCloseTab({ stopPropagation: () => {} } as React.MouseEvent, activeTabId);
+      
+      // Sync VectorDB after deletion
+      setIsSyncing(true);
+      await aiApi.syncVectorDB();
+    } catch (err: unknown) {
+      console.error(err);
+      setError(err instanceof Error ? err.message : 'Failed to delete note');
+    } finally {
+      setIsSaving(false);
+      setIsSyncing(false);
+    }
+  };
+
   // Function to close tab
   const handleCloseTab = (e: React.MouseEvent, idToClose: string) => {
     e.stopPropagation();
@@ -145,9 +240,14 @@ export default function Home() {
         isLoadingContent={isLoadingContent}
         tabContents={noteContentsById}  // Component prop remains unchanged
         handleContentChange={handleContentChange}
+        handleSaveNote={handleSaveNote}
+        handleDeleteNote={handleDeleteNote}
+        handleTitleChange={handleTitleChange}
+        isSaving={isSaving}
+        isSyncing={isSyncing}
       />
 
-      <Chat />
+      <Chat activeTabId={activeTabId} openTabs={openTabs} />
     </div>
   );
 }

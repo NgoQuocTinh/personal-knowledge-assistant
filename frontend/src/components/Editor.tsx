@@ -12,6 +12,11 @@ interface EditorProps {
   isLoadingContent: boolean;
   tabContents: Record<string, string>;
   handleContentChange: (content: string) => void;
+  handleSaveNote: () => void;
+  handleDeleteNote: () => void;
+  handleTitleChange: (id: string, newTitle: string) => void;
+  isSaving: boolean;
+  isSyncing: boolean;
 }
 
 export default function Editor(props: EditorProps) {
@@ -25,7 +30,12 @@ export default function Editor(props: EditorProps) {
     setViewMode,
     isLoadingContent,
     tabContents,
-    handleContentChange
+    handleContentChange,
+    handleSaveNote,
+    handleDeleteNote,
+    handleTitleChange,
+    isSaving,
+    isSyncing
   } = props;
 
   return (
@@ -89,9 +99,29 @@ export default function Editor(props: EditorProps) {
           </div>
         ) : viewMode === 'editor' ? (
           <div className="h-full flex flex-col mx-auto w-full max-w-4xl p-6 lg:p-10">
-            <h1 className="text-3xl font-bold mb-6 text-gray-900 tracking-tight px-1 cursor-text outline-none focus:ring-2 focus:ring-blue-100 rounded-md transition-all">
-              {openTabs.find(t => t.id === activeTabId)?.title}
-            </h1>
+            <div className="flex items-center justify-between mb-6">
+              <input
+                className="flex-1 text-3xl font-bold text-gray-900 tracking-tight px-1 outline-none focus:ring-2 focus:ring-blue-100 rounded-md transition-all bg-transparent disabled:opacity-75"
+                value={openTabs.find(t => t.id === activeTabId)?.title || ''}
+                onChange={(e) => handleTitleChange(activeTabId, e.target.value)}
+                placeholder="Note Title"
+              />
+              <div className="flex gap-2 shrink-0">
+                <button 
+                  onClick={handleDeleteNote}
+                  className="px-3 py-1.5 text-sm text-red-600 bg-red-50 hover:bg-red-100 rounded-md transition"
+                >
+                  Delete
+                </button>
+                <button 
+                  onClick={handleSaveNote}
+                  disabled={isSaving || isSyncing}
+                  className="px-4 py-1.5 text-sm text-white bg-blue-500 hover:bg-blue-600 disabled:bg-blue-300 disabled:cursor-not-allowed rounded-md transition flex items-center gap-1.5"
+                >
+                  {isSaving ? 'Saving...' : isSyncing ? 'Syncing...' : 'Save & Sync'}
+                </button>
+              </div>
+            </div>
             {isLoadingContent ? (
               <div className="text-gray-400 flex items-center justify-center flex-1">Loading content...</div>
             ) : (

@@ -8,3 +8,11 @@ export interface Tab {
   id: string;
   title: string;
 }
+
+export interface ChatMessage {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  sources?: string[];
+  isLoading?: boolean;
+}

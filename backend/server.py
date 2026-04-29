@@ -1,6 +1,7 @@
 import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+import asyncio
 from config.setting import get_settings
 
 from src.api.notes import router as notes_router
@@ -45,6 +46,31 @@ def health_check():
         "version": settings.app.version,
         "environment": settings.app.environment
     }
+
+@app.on_event("startup")
+async def startup_event():
+    """Preload AI models into RAM/VRAM (Warm-up) to reduce latency on first request."""
+    print("Preloading AI models into RAM/VRAM (Warm-up)... Please wait.")
+
+    def preload_models():
+        try:
+            # 1. Tải Embedding Model
+            from src.ingestion.embeddings import embedding_manager
+            embed_model = embedding_manager.get_embeddings()
+            embed_model.embed_query("Xin chào") 
+            print("Successfully loaded Embedding Model!")
+
+            # 2. Tải LLM Model (Gửi 1 request ẩn)
+            from src.llm.llm_factory import get_llm
+            llm = get_llm()
+            llm.invoke("Hi")
+            print("Successfully loaded LLM Model (Ollama/ChatModel)!")
+
+        except Exception as e:
+            print(f"Error occurred while preloading models: {e}")
+
+    # Chạy Background task để không block quá trình khởi động API
+    asyncio.create_task(asyncio.to_thread(preload_models))
 
 if __name__ == "__main__":
     uvicorn.run(

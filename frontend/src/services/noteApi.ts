@@ -1,4 +1,4 @@
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+import { API_BASE_URL } from './config';
 
 export const noteApi = {
   fetchNotes: async (signal?: AbortSignal) => {
@@ -15,8 +15,31 @@ export const noteApi = {
     return data.content || '';
   },
 
-  // TODO: Add these endpoints for future scalability
-  // createNote: async (data: { title: string; content: string }) => { ... }
-  // updateNote: async (id: string, data: { title?: string; content?: string }) => { ... }
-  // deleteNote: async (id: string) => { ... }
+  createNote: async (data: { title: string; content: string }) => {
+    const res = await fetch(`${API_BASE_URL}/api/notes/`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) throw new Error('Failed to create note');
+    return res.json();
+  },
+
+  updateNote: async (id: string, data: { content: string }) => {
+    const res = await fetch(`${API_BASE_URL}/api/notes/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) throw new Error('Failed to update note');
+    return res.json();
+  },
+
+  deleteNote: async (id: string) => {
+    const res = await fetch(`${API_BASE_URL}/api/notes/${id}`, {
+      method: 'DELETE',
+    });
+    if (!res.ok) throw new Error('Failed to delete note');
+    return res.json();
+  }
 };

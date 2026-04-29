@@ -44,6 +44,7 @@ def _create_ollama(cfg: Any) -> BaseChatModel:
         top_k=cfg.top_k,
         repeat_penalty=cfg.repeat_penalty,
         timeout=cfg.ollama.timeout,
+        keep_alive=-1, # Disable connection pooling to avoid "Connection reset by peer" errors with Ollama
     )
 
 
