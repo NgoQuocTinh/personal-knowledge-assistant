@@ -1,5 +1,6 @@
 import { FileText, Network, X } from 'lucide-react';
 import { Tab } from '../types';
+import GraphView from './GraphView';
 
 interface EditorProps {
   openTabs: Tab[];
@@ -15,6 +16,7 @@ interface EditorProps {
   handleSaveNote: () => void;
   handleDeleteNote: () => void;
   handleTitleChange: (id: string, newTitle: string) => void;
+  handleOpenFileFromGraph: (id: string) => void;
   isSaving: boolean;
   isSyncing: boolean;
 }
@@ -34,6 +36,7 @@ export default function Editor(props: EditorProps) {
     handleSaveNote,
     handleDeleteNote,
     handleTitleChange,
+    handleOpenFileFromGraph,
     isSaving,
     isSyncing
   } = props;
@@ -71,33 +74,38 @@ export default function Editor(props: EditorProps) {
         </div>
         
         {/* Tabs: Editor vs Graph */}
-        {openTabs.length > 0 && (
-          <div className="flex bg-gray-100 p-1 rounded-lg">
-            <button 
-              onClick={() => setViewMode('editor')}
-              className={`px-3 py-1 text-sm rounded-md transition-colors ${viewMode === 'editor' ? 'bg-white shadow-sm text-blue-600 font-medium' : 'text-gray-500 hover:text-gray-700'}`}
-            >
-              Editor
-            </button>
-            <button 
-              onClick={() => setViewMode('graph')}
-              className={`px-3 py-1 flex items-center gap-1.5 text-sm rounded-md transition-colors ${viewMode === 'graph' ? 'bg-white shadow-sm text-blue-600 font-medium' : 'text-gray-500 hover:text-gray-700'}`}
-            >
-              <Network size={14} /> Graph
-            </button>
-          </div>
-        )}
+        <div className="flex bg-gray-100 p-1 rounded-lg">
+          <button 
+            onClick={() => setViewMode('editor')}
+            className={`px-3 py-1 text-sm rounded-md transition-colors ${viewMode === 'editor' ? 'bg-white shadow-sm text-blue-600 font-medium' : 'text-gray-500 hover:text-gray-700'}`}
+          >
+            Editor
+          </button>
+          <button 
+            onClick={() => setViewMode('graph')}
+            className={`px-3 py-1 flex items-center gap-1.5 text-sm rounded-md transition-colors ${viewMode === 'graph' ? 'bg-white shadow-sm text-blue-600 font-medium' : 'text-gray-500 hover:text-gray-700'}`}
+          >
+            <Network size={14} /> Graph
+          </button>
+        </div>
       </div>
 
       {/* Content Area */}
       <div className="flex-1 overflow-auto bg-white">
-        {openTabs.length === 0 ? (
+        {viewMode === 'graph' ? (
+          <div className="w-full h-full flex flex-col relative bg-gray-50 border-t border-gray-100 overflow-hidden">
+             <div className="absolute top-2 left-4 z-10 text-sm text-gray-500 font-medium">
+               Knowledge Graph
+             </div>
+             <GraphView onNodeClick={handleOpenFileFromGraph} />
+          </div>
+        ) : openTabs.length === 0 ? (
           <div className="w-full h-full flex flex-col items-center justify-center text-gray-400 gap-4 bg-gray-50">
             <FileText size={48} className="text-gray-300" />
             <p>No file is open.</p>
             <button onClick={handleNewNote} className="mt-2 px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition">Create New Note</button>
           </div>
-        ) : viewMode === 'editor' ? (
+        ) : (
           <div className="h-full flex flex-col mx-auto w-full max-w-4xl p-6 lg:p-10">
             <div className="flex items-center justify-between mb-6">
               <input
@@ -132,11 +140,6 @@ export default function Editor(props: EditorProps) {
                 placeholder="Start typing your note here..."
               />
             )}
-          </div>
-        ) : (
-          <div className="w-full h-full flex flex-col items-center justify-center bg-gray-50 text-gray-400 gap-4 border-t border-gray-100">
-             <Network size={48} className="text-gray-300" />
-             <p>Interactive Knowledge Graph will be rendered here...</p>
           </div>
         )}
       </div>

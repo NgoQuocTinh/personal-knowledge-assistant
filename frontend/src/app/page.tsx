@@ -108,6 +108,19 @@ export default function Home() {
     setNoteContentsById(prev => ({ ...prev, [activeTabId]: newContent }));
   };
 
+  const handleOpenFileFromGraph = (id: string) => {
+    // API `/api/graph` returns id as the file stem (e.g., "Note Title") which matches `note.title`
+    // API `/api/notes` returns id as a base64 encoded string.
+    const note = notes.find(n => n.id === id || n.title === id);
+    if (note) {
+      handleOpenFile(note);
+      setViewMode('editor');
+    } else {
+      console.warn("Ghost note clicked or note not found in the list:", id);
+      // Optional: Ask user if they want to create a note for this Ghost Node
+    }
+  };
+
   const handleTitleChange = (id: string, newTitle: string) => {
     setOpenTabs(prevTabs => Object.assign([], prevTabs).map((tab: Tab) => 
       tab.id === id ? { ...tab, title: newTitle } : tab
@@ -243,6 +256,7 @@ export default function Home() {
         handleSaveNote={handleSaveNote}
         handleDeleteNote={handleDeleteNote}
         handleTitleChange={handleTitleChange}
+        handleOpenFileFromGraph={handleOpenFileFromGraph}
         isSaving={isSaving}
         isSyncing={isSyncing}
       />
