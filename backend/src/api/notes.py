@@ -114,15 +114,21 @@ def create_note(note: NoteCreate):
     """Create a new Markdown file"""
     # Clean up filename (remove extra spaces) & check security
     safe_title = note.title.strip().replace("/", "_").replace("\\", "_")
-    filename = f"{safe_title}.md"
-    file_path = DATA_DIR / filename
     
-    if file_path.exists():
-        raise HTTPException(status_code=400, detail="Note title already exists! Please choose another name.")
+    # Simple logic to avoid duplicate name (auto append (1), (2), etc.)
+    base_title = safe_title
+    counter = 1
+    while True:
+        filename = f"{safe_title}.md"
+        file_path = DATA_DIR / filename
+        if not file_path.exists():
+            break
+        safe_title = f"{base_title} ({counter})"
+        counter += 1
         
     try:
         file_path.write_text(note.content, encoding='utf-8')
-        return {"message": "Note created successfully", "id": encode_id(filename)}
+        return {"message": "Note created successfully", "id": encode_id(filename), "title": safe_title}
     except Exception as e:
         logger.error(f"Error creating note {filename}: {e}")
         raise HTTPException(status_code=500, detail="Error saving file")

@@ -20,6 +20,8 @@ interface MyNode extends NodeObject {
 interface MyLink extends LinkObject {
   source: string;
   target: string;
+  type?: 'explicit' | 'semantic';
+  score?: number;
 }
 
 interface GraphData {
@@ -51,7 +53,8 @@ const ForceGraph2D = dynamic(
   nodeLabel?: string | ((node: MyNode) => string);
   nodeColor?: (node: MyNode) => string;
   nodeRelSize?: number;
-  linkColor?: () => string;
+  linkColor?: string | ((link: MyLink) => string);
+  linkLineDash?: (link: MyLink) => number[] | null;
   linkDirectionalParticles?: number;
   linkDirectionalParticleSpeed?: number;
   onNodeClick?: (node: MyNode) => void;
@@ -138,7 +141,8 @@ export default function GraphView({
           node.group === 'ghost' ? '#d1d5db' : '#3b82f6'
         }
         nodeRelSize={6}
-        linkColor={() => '#cbd5e1'}
+        linkColor={(link: MyLink) => link.type === 'semantic' ? '#a1c8fc' : '#94a3b8'} // Nhạt hơn cho semantic
+        linkLineDash={(link: MyLink) => link.type === 'semantic' ? [5, 5] : null} // Nét đứt
         linkDirectionalParticles={2}
         linkDirectionalParticleSpeed={0.005}
         onNodeClick={handleNodeClick}

@@ -14,6 +14,8 @@ from src.llm.llm_factory import get_llm
 from langchain_chroma import Chroma
 from langchain_core.output_parsers import StrOutputParser
 
+from src.api.graph import generate_and_cache_graph
+
 logger = setup_logger(__name__)
 router = APIRouter(prefix="/api/ai", tags=["AI"])
 settings = get_settings()
@@ -41,11 +43,22 @@ def sync_markdown_to_vector_db():
     logger.info("Starting Markdown VectorDB sync...")
     
     try:
-        # Delete old ChromaDB if it exists
         db_path = Path(settings.paths.db_dir)
+        # Lấy Embedding Model sớm để phục vụ việc clear DB
+        embeddings = embedding_manager.get_embeddings()
+        
+        # Clear collection một cách an toàn thay vì xóa nguyên thư mục vật lý (tránh lỗi khóa file trên Windows)
         if db_path.exists() and db_path.is_dir():
-            shutil.rmtree(db_path)
-            logger.info("Deleted old ChromaDB data.")
+            try:
+                old_db = Chroma(
+                    persist_directory=str(db_path),
+                    embedding_function=embeddings,
+                    collection_name=settings.vectordb.collection_name
+                )
+                old_db.delete_collection()
+                logger.info("Cleared old ChromaDB collection.")
+            except Exception as e:
+                logger.warning(f"Could not clear old collection (may not exist): {e}")
     
         # Scan and process markdown files
         processor = MarkdownProcessor()
@@ -59,9 +72,6 @@ def sync_markdown_to_vector_db():
                 chunks_created=0
             )
             
-        # Get Embedding Model
-        embeddings = embedding_manager.get_embeddings()
-        
         # Load into ChromaDB
         vectordb = Chroma.from_documents(
             documents=chunks,
@@ -84,6 +94,11 @@ def sync_markdown_to_vector_db():
             filename = c.metadata.get('filename')
             if filename:
                 unique_files.add(filename)
+                
+        # Generate & Cache Semantic Graph data after ChromaDB is ready
+        logger.info("Executing async graph caching task...")
+        # Since it's in sync logic, we can run it synchronously before return
+        generate_and_cache_graph()
                 
         return SyncResponse(
             status="success",
