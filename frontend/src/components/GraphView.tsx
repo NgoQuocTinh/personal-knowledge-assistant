@@ -141,7 +141,7 @@ export default function GraphView({
           node.group === 'ghost' ? '#d1d5db' : '#3b82f6'
         }
         nodeRelSize={6}
-        linkColor={(link: MyLink) => link.type === 'semantic' ? '#a1c8fc' : '#94a3b8'} // Nhạt hơn cho semantic
+        linkColor={(link: MyLink) => link.type === 'semantic' ? '#e2e8f0' : '#94a3b8'} // Nhạt hơn cho semantic
         linkLineDash={(link: MyLink) => link.type === 'semantic' ? [5, 5] : null} // Nét đứt
         linkDirectionalParticles={2}
         linkDirectionalParticleSpeed={0.005}
