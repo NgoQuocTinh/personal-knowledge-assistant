@@ -1,8 +1,10 @@
 import shutil
+import json
 from pathlib import Path
 from typing import List, Optional
 from pydantic import BaseModel
 from fastapi import APIRouter, HTTPException
+from fastapi.responses import StreamingResponse
 
 from config.setting import get_settings
 from src.utils.logger import setup_logger
@@ -111,11 +113,11 @@ def sync_markdown_to_vector_db():
         logger.error(f"Error during sync: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Sync failed: {str(e)}")
 
-@router.post("/chat", response_model=ChatResponse)
+@router.post("/chat")
 def chat_with_ai(request: ChatRequest):
     """
-    RAG Chat endpoint. Can filter static context by `selected_files` list.
-    (NotebookLLM style multi-source grounding)
+    RAG Chat endpoint with Server-Sent Events (SSE) Streaming.
+    Can filter static context by `selected_files` list.
     """
     logger.info(f"Received chat query. Grounding files: {request.selected_files}")
     
@@ -160,15 +162,23 @@ def chat_with_ai(request: ChatRequest):
         
         # Langchain chain execution
         chain = prompt | llm | StrOutputParser()
-        answer = chain.invoke({
-            "context": context_text,
-            "question": request.query
-        })
         
-        return ChatResponse(
-            answer=answer,
-            sources=unique_sources
-        )
+        def response_generator():
+            # First, send the list of sources
+            yield f"data: {json.dumps({'sources': unique_sources})}\n\n"
+            
+            # Then, stream the LLM response chunk by chunk
+            for chunk in chain.stream({
+                "context": context_text,
+                "question": request.query
+            }):
+                # Send each piece of text inside a JSON event
+                yield f"data: {json.dumps({'answer_chunk': chunk})}\n\n"
+                
+            # Finally, send a concluding message
+            yield "data: [DONE]\n\n"
+            
+        return StreamingResponse(response_generator(), media_type="text/event-stream")
         
     except HTTPException:
         # Re-raise known exceptions

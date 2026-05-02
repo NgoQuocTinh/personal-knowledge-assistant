@@ -53,16 +53,30 @@ export default function Chat({ activeTabId, openTabs }: ChatProps) {
       const tempId = (Date.now() + 1).toString();
       setMessages(prev => [...prev, { id: tempId, role: 'assistant', content: '', isLoading: true }]);
 
-      const res = await aiApi.chatWithAI(userMessage.content, selectedFiles);
-
-      setMessages(prev => prev.map(msg => 
-        msg.id === tempId ? {
-          ...msg,
-          content: res.answer,
-          sources: res.sources,
-          isLoading: false
-        } : msg
-      ));
+      await aiApi.chatWithAI(
+        userMessage.content, 
+        selectedFiles,
+        {
+          onSources: (sources) => {
+            setMessages(prev => prev.map(msg => 
+              msg.id === tempId ? {
+                ...msg,
+                sources: sources,
+                isLoading: false
+              } : msg
+            ));
+          },
+          onChunk: (chunk) => {
+            setMessages(prev => prev.map(msg => 
+              msg.id === tempId ? {
+                ...msg,
+                content: msg.content + chunk,
+                isLoading: false
+              } : msg
+            ));
+          }
+        }
+      );
     } catch (err: unknown) {
       console.error(err);
       setMessages(prev => prev.map(msg => 
