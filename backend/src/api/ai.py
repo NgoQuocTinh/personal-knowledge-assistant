@@ -11,7 +11,7 @@ from src.utils.logger import setup_logger
 from src.ingestion.markdown_processor import MarkdownProcessor
 from src.ingestion.embeddings import embedding_manager
 from src.retrieval.retriever import AdvancedRetriever
-from src.chat.prompts import get_rag_prompt
+from src.chat.prompts import get_rag_prompt, get_conversation_prompt
 from src.llm.llm_factory import get_llm
 from langchain_chroma import Chroma
 from langchain_core.output_parsers import StrOutputParser
@@ -28,9 +28,14 @@ class SyncResponse(BaseModel):
     documents_processed: int
     chunks_created: int
 
+class Message(BaseModel):
+    role: str
+    content: str
+
 class ChatRequest(BaseModel):
     query: str
     selected_files: Optional[List[str]] = None
+    messages: Optional[List[Message]] = None
 
 class ChatResponse(BaseModel):
     answer: str
@@ -156,9 +161,28 @@ def chat_with_ai(request: ChatRequest):
         context_text = "\n\n".join([f"[Document: {d.metadata.get('filename')}]\n{d.page_content}" for d in docs])
         unique_sources = retriever.get_unique_sources(docs)
         
+        # Build string history
+        history_text = ""
+        if request.messages:
+            for msg in request.messages[-5:]: # Get last 5 msgs
+                role = "User" if msg.role == "user" else "AI"
+                history_text += f"{role}: {msg.content}\n"
+        
         # Initialize LLM
         llm = get_llm()
-        prompt = get_rag_prompt()
+        if history_text.strip():
+            prompt = get_conversation_prompt()
+            inputs = {
+                "context": context_text,
+                "history": history_text,
+                "question": request.query
+            }
+        else:
+            prompt = get_rag_prompt()
+            inputs = {
+                "context": context_text,
+                "question": request.query
+            }
         
         # Langchain chain execution
         chain = prompt | llm | StrOutputParser()
@@ -168,10 +192,7 @@ def chat_with_ai(request: ChatRequest):
             yield f"data: {json.dumps({'sources': unique_sources})}\n\n"
             
             # Then, stream the LLM response chunk by chunk
-            for chunk in chain.stream({
-                "context": context_text,
-                "question": request.query
-            }):
+            for chunk in chain.stream(inputs):
                 # Send each piece of text inside a JSON event
                 yield f"data: {json.dumps({'answer_chunk': chunk})}\n\n"
                 

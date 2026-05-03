@@ -12,10 +12,16 @@ export interface SyncResponse {
   chunks_created: number;
 }
 
+export interface ApiMessage {
+  role: string;
+  content: string;
+}
+
 export const aiApi = {
   chatWithAI: async (
     query: string, 
     selectedFiles?: string[], 
+    messages?: ApiMessage[],
     callbacks?: {
       onSources?: (sources: string[]) => void;
       onChunk?: (chunk: string) => void;
@@ -30,6 +36,7 @@ export const aiApi = {
       body: JSON.stringify({
         query: query,
         selected_files: selectedFiles && selectedFiles.length > 0 ? selectedFiles : null,
+        messages: messages || []
       }),
       signal,
     });

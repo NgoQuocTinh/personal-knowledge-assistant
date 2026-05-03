@@ -51,11 +51,18 @@ export default function Chat({ activeTabId, openTabs }: ChatProps) {
 
     try {
       const tempId = (Date.now() + 1).toString();
+      
+      // format history messages excluding the temp loading msg
+      const historyMessages = messages
+          .filter(m => !m.isLoading && m.content)
+          .map(m => ({ role: m.role, content: m.content }));
+
       setMessages(prev => [...prev, { id: tempId, role: 'assistant', content: '', isLoading: true }]);
 
       await aiApi.chatWithAI(
         userMessage.content, 
         selectedFiles,
+        historyMessages,
         {
           onSources: (sources) => {
             setMessages(prev => prev.map(msg => 
