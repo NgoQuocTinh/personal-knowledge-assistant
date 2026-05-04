@@ -52,7 +52,17 @@ def get_conversation_prompt() -> ChatPromptTemplate:
     # Build rules string
     rules_text = "\n".join([f"{i+1}. {rule}" for i, rule in enumerate(config.rules)])
     
-    template = f"""{config.system_message}
+    # If the YAML has conversation_template, use it, else fallback
+    if hasattr(config, 'conversation_template') and config.conversation_template:
+        template = config.conversation_template.format(
+            system_message=config.system_message,
+            rules=rules_text,
+            history="{history}",
+            context="{context}",
+            question="{question}"
+        )
+    else:
+        template = f"""{config.system_message}
 
     RULES:
     {rules_text}

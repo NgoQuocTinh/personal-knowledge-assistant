@@ -51,10 +51,11 @@ def sync_markdown_to_vector_db():
     
     try:
         db_path = Path(settings.paths.db_dir)
-        # Lấy Embedding Model sớm để phục vụ việc clear DB
+        # Ensure the DB directory exists
+        db_path.mkdir(parents=True, exist_ok=True)
         embeddings = embedding_manager.get_embeddings()
         
-        # Clear collection một cách an toàn thay vì xóa nguyên thư mục vật lý (tránh lỗi khóa file trên Windows)
+        # Clear old DB collection if it exists to avoid stale data (ChromaDB will create a new one if it doesn't exist)
         if db_path.exists() and db_path.is_dir():
             try:
                 old_db = Chroma(
@@ -148,10 +149,21 @@ def chat_with_ai(request: ChatRequest):
                 search_filter = {"filename": request.selected_files[0]}
             else:
                 search_filter = {"filename": {"$in": request.selected_files}}
+                
+        # Enhance search query to solve Contextual Pronouns by including recent User messages as keywords for better MMR retrieval
+        search_query = request.query
+        if request.messages:
+            # Take the last few user messages to enrich the search query for better context retrieval, especially for pronouns or vague references
+            last_user_msgs = [m.content for m in request.messages if m.role == 'user']
+            if last_user_msgs:
+                # only take the last 3 user messages to avoid making the query too long, and concatenate them with the current question
+                # This way, if the user asks "What about it?" after a previous question, the retriever can use the recent user messages to understand what "it" refers to and retrieve more relevant documents.
+                context_msgs = last_user_msgs[-3:]
+                search_query = " ".join(context_msgs) + f" {request.query}"
             
         # Retrieve docs using MMR and filter
         docs = retriever.retrieve(
-            query=request.query,
+            query=search_query,
             search_type='mmr',
             k=settings.retrieval.k,
             filter=search_filter
