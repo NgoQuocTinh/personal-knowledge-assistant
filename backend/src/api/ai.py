@@ -11,7 +11,7 @@ from src.utils.logger import setup_logger
 from src.ingestion.markdown_processor import MarkdownProcessor
 from src.ingestion.embeddings import embedding_manager
 from src.retrieval.retriever import AdvancedRetriever
-from src.chat.prompts import get_rag_prompt, get_conversation_prompt
+from src.chat.prompts import get_rag_prompt, get_conversation_prompt, get_standalone_question_prompt
 from src.llm.llm_factory import get_llm
 from langchain_chroma import Chroma
 from langchain_core.output_parsers import StrOutputParser
@@ -150,18 +150,29 @@ def chat_with_ai(request: ChatRequest):
             else:
                 search_filter = {"filename": {"$in": request.selected_files}}
                 
-        # Enhance search query to solve Contextual Pronouns by including recent User messages as keywords for better MMR retrieval
-        search_query = request.query
+        # Build string history
+        history_text = ""
         if request.messages:
-            # Take the last few user messages to enrich the search query for better context retrieval, especially for pronouns or vague references
-            last_user_msgs = [m.content for m in request.messages if m.role == 'user']
-            if last_user_msgs:
-                # only take the last 3 user messages to avoid making the query too long, and concatenate them with the current question
-                # This way, if the user asks "What about it?" after a previous question, the retriever can use the recent user messages to understand what "it" refers to and retrieve more relevant documents.
-                context_msgs = last_user_msgs[-3:]
-                search_query = " ".join(context_msgs) + f" {request.query}"
+            for msg in request.messages[-5:]: # Get last 5 msgs
+                role = "User" if msg.role == "user" else "AI"
+                history_text += f"{role}: {msg.content}\n"
+                
+        # Initialize LLM
+        llm = get_llm()
+
+        # ADVANCED RAG: LLM Query Reformulation (Standalone Question)
+        search_query = request.query
+        if history_text.strip():
+            logger.info("Reformulating query based on history...")
+            reformulate_prompt = get_standalone_question_prompt()
+            reformulate_chain = reformulate_prompt | llm | StrOutputParser()
+            search_query = reformulate_chain.invoke({
+                "history": history_text,
+                "question": request.query
+            }).strip()
+            logger.info(f"Re-formulated Query: {search_query}")
             
-        # Retrieve docs using MMR and filter
+        # Retrieve docs using MMR and filter with the reformulated query
         docs = retriever.retrieve(
             query=search_query,
             search_type='mmr',
@@ -173,15 +184,6 @@ def chat_with_ai(request: ChatRequest):
         context_text = "\n\n".join([f"[Document: {d.metadata.get('filename')}]\n{d.page_content}" for d in docs])
         unique_sources = retriever.get_unique_sources(docs)
         
-        # Build string history
-        history_text = ""
-        if request.messages:
-            for msg in request.messages[-5:]: # Get last 5 msgs
-                role = "User" if msg.role == "user" else "AI"
-                history_text += f"{role}: {msg.content}\n"
-        
-        # Initialize LLM
-        llm = get_llm()
         if history_text.strip():
             prompt = get_conversation_prompt()
             inputs = {
