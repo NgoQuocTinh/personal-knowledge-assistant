@@ -89,8 +89,12 @@ def get_standalone_question_prompt() -> ChatPromptTemplate:
     Prompt to rewrite a contextual query into a standalone query.
     Used for Advanced RAG Query Reformulation.
     """
-    template = """Given the following conversation history and a new user question, rewrite the new question to be a standalone question that can be understood entirely on its own, without relying on the conversation history. It must encompass the specific entity or subject mentioned previously.
-    Do NOT answer the question. ONLY return the rewritten standalone question. If the new question is already standalone, just return it as is.
+    template = """Given the following conversation history and a new user question, rewrite the new question to be a standalone question that can be understood entirely on its own.
+    
+    CRITICAL INSTRUCTIONS:
+    1. FOLLOW-UP: If the new question is a follow-up related to the conversation history, rewrite it to encompass the specific entity or subject mentioned previously.
+    2. NEW TOPIC (TOPIC SHIFT): If the new question asks about a COMPLETELY NEW OR DIFFERENT TOPIC, DO NOT force a connection with the history. Simply return the new question EXACTLY as it is.
+    3. Do NOT answer the question. ONLY return the rewritten standalone query.
     
     Conversation History:
     {history}
