@@ -8,6 +8,8 @@ langchain-chroma
 langchain-core
 langchain-ollama
 langchain-google-genai
+langchain-community
+langchain-huggingface
 chromadb
 sentence-transformers
 pyyaml
