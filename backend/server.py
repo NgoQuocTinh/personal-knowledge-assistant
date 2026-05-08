@@ -27,7 +27,16 @@ app.include_router(ai_router)
 origins = [
     "http://localhost:3000",   # Default Next.js
     "http://localhost:5173",   # Default Vite/SvelteKit
+    "*",                       # Allow all origins for Production
 ]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 app.add_middleware(
     CORSMiddleware,
