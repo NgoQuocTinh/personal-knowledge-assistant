@@ -56,35 +56,17 @@ def health_check():
         "environment": settings.app.environment
     }
 
-@app.on_event("startup")
-async def startup_event():
-    """Preload AI models into RAM/VRAM (Warm-up) to reduce latency on first request."""
-    print("Preloading AI models into RAM/VRAM (Warm-up)... Please wait.")
+# --- DISABLED PRELOAD FOR RENDER DEPLOYMENT ---
+# @app.on_event("startup")
+# async def startup_event():
+#     """Preload AI models into RAM/VRAM (Warm-up) to reduce latency on first request."""
+#     ...
 
-    def preload_models():
-        try:
-            # 1. Tải Embedding Model
-            from src.ingestion.embeddings import embedding_manager
-            embed_model = embedding_manager.get_embeddings()
-            embed_model.embed_query("Xin chào") 
-            print("Successfully loaded Embedding Model!")
-
-            # 2. Tải LLM Model (Gửi 1 request ẩn)
-            from src.llm.llm_factory import get_llm
-            llm = get_llm()
-            llm.invoke("Hi")
-            print("Successfully loaded LLM Model (Ollama/ChatModel)!")
-
-        except Exception as e:
-            print(f"Error occurred while preloading models: {e}")
-
-    # Chạy Background task để không block quá trình khởi động API
-    asyncio.create_task(asyncio.to_thread(preload_models))
-
+import os
 if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 8000))
     uvicorn.run(
         "server:app",
         host="0.0.0.0",
-        port=8000,
-        reload=True # Auto restart on code change (for dev environment)
+        port=port
     )
